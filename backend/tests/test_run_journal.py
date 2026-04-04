@@ -373,7 +373,7 @@ class TestDbBackedLifecycle:
         run_id = record.run_id
 
         # Write human_message
-        await event_store.put(thread_id="t1", run_id=run_id, event_type="human_message", category="message", content="Hello DB")
+        await event_store.put(thread_id="t1", run_id=run_id, event_type="human_message", category="message", content={"role": "user", "content": "Hello DB"})
 
         # Simulate journal
         journal = RunJournal(run_id, "t1", event_store, flush_threshold=100)
@@ -554,3 +554,21 @@ class TestDictContent:
         assert len(record["content"]) <= 100
 
         await close_engine()
+
+
+class TestOpenAIHumanMessage:
+    @pytest.mark.anyio
+    async def test_human_message_openai_format(self):
+        store = MemoryRunEventStore()
+        await store.put(
+            thread_id="t1",
+            run_id="r1",
+            event_type="human_message",
+            category="message",
+            content={"role": "user", "content": "What is AI?"},
+            metadata={"message_id": "msg_001"},
+        )
+        messages = await store.list_messages("t1")
+        assert len(messages) == 1
+        assert messages[0]["content"] == {"role": "user", "content": "What is AI?"}
+        assert messages[0]["content"]["role"] == "user"

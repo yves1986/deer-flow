@@ -78,7 +78,7 @@ async def run_agent(
                 run_id=run_id,
                 event_type="human_message",
                 category="message",
-                content=user_input,
+                content={"role": "user", "content": user_input},
                 metadata=msg_metadata or None,
             )
             journal.set_first_human_message(user_input)

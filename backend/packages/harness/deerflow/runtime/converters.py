@@ -56,7 +56,7 @@ def langchain_to_openai_message(message: Any) -> dict:
                     },
                 })
             # If no text content, set content to null per OpenAI spec
-            result["content"] = content if (isinstance(content, list) or content) else None
+            result["content"] = content if (isinstance(content, list) and content) or (isinstance(content, str) and content) else None
             result["tool_calls"] = openai_tool_calls
         else:
             result["content"] = content

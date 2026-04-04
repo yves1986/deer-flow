@@ -123,10 +123,6 @@ class TestLangchainToOpenaiMessage:
 
 class TestLangchainToOpenaiCompletion:
     def test_basic_completion(self):
-        usage = MagicMock()
-        usage.__getitem__ = lambda self, k: {"input_tokens": 10, "output_tokens": 20}[k]
-        usage.get = lambda k, d=None: {"input_tokens": 10, "output_tokens": 20}.get(k, d)
-        # Use a real dict for usage_metadata
         usage_metadata = {"input_tokens": 10, "output_tokens": 20}
         msg = _make_ai_message(
             content="Hello",

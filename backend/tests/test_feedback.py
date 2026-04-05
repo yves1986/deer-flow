@@ -117,14 +117,16 @@ class TestFeedbackRepository:
     async def test_delete(self, tmp_path):
         repo = await _make_feedback_repo(tmp_path)
         created = await repo.create(run_id="r1", thread_id="t1", rating=1)
-        assert await repo.delete(created["feedback_id"]) is True
+        deleted = await repo.delete(created["feedback_id"])
+        assert deleted is True
         assert await repo.get(created["feedback_id"]) is None
         await _cleanup()
 
     @pytest.mark.anyio
     async def test_delete_nonexistent(self, tmp_path):
         repo = await _make_feedback_repo(tmp_path)
-        assert await repo.delete("nonexistent") is False
+        deleted = await repo.delete("nonexistent")
+        assert deleted is False
         await _cleanup()
 
     @pytest.mark.anyio

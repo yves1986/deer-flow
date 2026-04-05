@@ -51,6 +51,7 @@ class JsonlRunEventStore(RunEventStore):
                         record = json.loads(line)
                         max_seq = max(max_seq, record.get("seq", 0))
                     except json.JSONDecodeError:
+                        logger.debug("Skipping malformed JSONL line in %s", f)
                         continue
         self._seq_counters[thread_id] = max_seq
 
@@ -73,6 +74,7 @@ class JsonlRunEventStore(RunEventStore):
                 try:
                     events.append(json.loads(line))
                 except json.JSONDecodeError:
+                    logger.debug("Skipping malformed JSONL line in %s", f)
                     continue
         events.sort(key=lambda e: e.get("seq", 0))
         return events
@@ -89,6 +91,7 @@ class JsonlRunEventStore(RunEventStore):
             try:
                 events.append(json.loads(line))
             except json.JSONDecodeError:
+                logger.debug("Skipping malformed JSONL line in %s", path)
                 continue
         events.sort(key=lambda e: e.get("seq", 0))
         return events

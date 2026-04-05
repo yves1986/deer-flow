@@ -5,7 +5,6 @@ Each method acquires its own short-lived session.
 
 from __future__ import annotations
 
-import logging
 import uuid
 from datetime import UTC, datetime
 
@@ -13,8 +12,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from deerflow.persistence.models.feedback import FeedbackRow
-
-logger = logging.getLogger(__name__)
 
 
 class FeedbackRepository:

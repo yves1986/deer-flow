@@ -10,13 +10,15 @@ None and fall back to in-memory implementations.
 
 from __future__ import annotations
 
-import logging
-
 import json
+import logging
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
-_json_serializer = lambda obj: json.dumps(obj, ensure_ascii=False)
+
+def _json_serializer(obj: object) -> str:
+    """JSON serializer with ensure_ascii=False for Chinese character support."""
+    return json.dumps(obj, ensure_ascii=False)
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +108,9 @@ async def init_engine(
     try:
         import deerflow.persistence.models  # noqa: F401
     except ImportError:
-        pass
+        # Models package not yet available — tables won't be auto-created.
+        # This is expected during initial scaffolding or minimal installs.
+        logger.debug("deerflow.persistence.models not found; skipping auto-create tables")
 
     try:
         async with _engine.begin() as conn:

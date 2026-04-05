@@ -135,7 +135,7 @@ class RunJournal(BaseCallbackHandler):
         self._llm_start_times[str(run_id)] = time.monotonic()
 
     def on_llm_end(self, response: Any, *, run_id: UUID, **kwargs: Any) -> None:
-        from deerflow.runtime.converters import langchain_to_openai_completion, langchain_to_openai_message
+        from deerflow.runtime.converters import langchain_to_openai_completion
 
         try:
             message = response.generations[0][0].message

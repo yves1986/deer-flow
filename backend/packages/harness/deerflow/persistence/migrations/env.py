@@ -8,6 +8,7 @@ have their own schema lifecycle and must not be touched by Alembic.
 from __future__ import annotations
 
 import asyncio
+import logging
 from logging.config import fileConfig
 
 from alembic import context
@@ -17,9 +18,13 @@ from deerflow.persistence.base import Base
 
 # Import all models so metadata is populated.
 try:
-    import deerflow.persistence.models  # noqa: F401
+    import deerflow.persistence.models  # noqa: F401 — register ORM models with Base.metadata
 except ImportError:
-    pass
+    # Models not available — migration will work with existing metadata only.
+    logging.getLogger(__name__).warning(
+        "Could not import deerflow.persistence.models; "
+        "Alembic may not detect all tables"
+    )
 
 config = context.config
 if config.config_file_name is not None:

@@ -17,7 +17,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    from langchain_core.messages import HumanMessage
 
 from deerflow.runtime.serialization import serialize
 from deerflow.runtime.stream_bridge import StreamBridge
@@ -273,6 +276,14 @@ async def run_agent(
             except Exception:
                 logger.debug("Failed to sync title for thread %s (non-fatal)", thread_id)
 
+        # Update threads_meta status based on run outcome
+        if thread_meta_repo is not None:
+            try:
+                final_status = "idle" if record.status == RunStatus.success else record.status.value
+                await thread_meta_repo.update_status(thread_id, final_status)
+            except Exception:
+                logger.debug("Failed to update thread_meta status for %s (non-fatal)", thread_id)
+
         await bridge.publish_end(run_id)
         asyncio.create_task(bridge.cleanup(run_id, delay=60))
 
@@ -294,7 +305,7 @@ def _lg_mode_to_sse_event(mode: str) -> str:
     return mode
 
 
-def _extract_human_message(graph_input: dict) -> "HumanMessage | None":
+def _extract_human_message(graph_input: dict) -> HumanMessage | None:
     """Extract or construct a HumanMessage from graph_input for event recording.
 
     Returns a LangChain HumanMessage so callers can use .model_dump() to get

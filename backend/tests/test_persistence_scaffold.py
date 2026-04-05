@@ -225,6 +225,8 @@ class TestEngineLifecycle:
 
             pytest.skip("asyncpg is installed -- cannot test missing-dep path")
         except ImportError:
-            pass
+            # asyncpg is not installed — this is the expected state for this test.
+            # We proceed to verify that init_engine raises an actionable ImportError.
+            pass  # noqa: S110 — intentionally ignored
         with pytest.raises(ImportError, match="uv sync --extra postgres"):
             await init_engine("postgres", url="postgresql+asyncpg://x:x@localhost/x")

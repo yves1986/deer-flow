@@ -8,7 +8,6 @@ minutes -- we don't hold connections across long execution.
 from __future__ import annotations
 
 import json
-import logging
 from datetime import UTC, datetime
 from typing import Any
 
@@ -17,8 +16,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from deerflow.persistence.models.run import RunRow
 from deerflow.runtime.runs.store.base import RunStore
-
-logger = logging.getLogger(__name__)
 
 
 class RunRepository(RunStore):

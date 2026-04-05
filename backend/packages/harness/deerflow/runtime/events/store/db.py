@@ -7,6 +7,7 @@ at ``max_trace_content`` bytes to avoid bloating the database.
 from __future__ import annotations
 
 import json
+import logging
 from datetime import UTC, datetime
 
 from sqlalchemy import delete, func, select
@@ -14,6 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from deerflow.persistence.models.run_event import RunEventRow
 from deerflow.runtime.events.store.base import RunEventStore
+
+logger = logging.getLogger(__name__)
 
 
 class DbRunEventStore(RunEventStore):
@@ -35,15 +38,19 @@ class DbRunEventStore(RunEventStore):
             try:
                 d["content"] = json.loads(raw)
             except (json.JSONDecodeError, ValueError):
-                pass
+                # Content looked like JSON (content_is_dict flag) but failed to parse;
+                # keep the raw string as-is.
+                logger.debug("Failed to deserialize content as JSON for event seq=%s", d.get("seq"))
         return d
 
     def _truncate_trace(self, category: str, content: str | dict, metadata: dict | None) -> tuple[str | dict, dict]:
         if category == "trace":
             text = json.dumps(content, default=str, ensure_ascii=False) if isinstance(content, dict) else content
-            if len(text) > self._max_trace_content:
-                content = text[: self._max_trace_content]
-                metadata = {**(metadata or {}), "content_truncated": True}
+            encoded = text.encode("utf-8")
+            if len(encoded) > self._max_trace_content:
+                # Truncate by bytes, then decode back (may cut a multi-byte char, so use errors="ignore")
+                content = encoded[: self._max_trace_content].decode("utf-8", errors="ignore")
+                metadata = {**(metadata or {}), "content_truncated": True, "original_byte_length": len(encoded)}
         return content, metadata or {}
 
     async def put(self, *, thread_id, run_id, event_type, category, content="", metadata=None, created_at=None):

@@ -5,10 +5,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock
 
-import pytest
-
 from deerflow.runtime.converters import (
-    _infer_finish_reason,
     langchain_messages_to_openai,
     langchain_to_openai_completion,
     langchain_to_openai_message,

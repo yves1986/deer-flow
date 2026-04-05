@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from datetime import UTC, datetime
 from typing import Any
 
@@ -10,8 +9,6 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from deerflow.persistence.models.thread_meta import ThreadMetaRow
-
-logger = logging.getLogger(__name__)
 
 
 class ThreadMetaRepository:

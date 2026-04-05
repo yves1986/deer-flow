@@ -456,7 +456,7 @@ class TestDictContentFlag:
         sf = get_session_factory()
         store = DbRunEventStore(sf)
 
-        record = await store.put(
+        await store.put(
             thread_id="t1",
             run_id="r1",
             event_type="tool_end",
@@ -480,7 +480,7 @@ class TestDictContentFlag:
         sf = get_session_factory()
         store = DbRunEventStore(sf)
 
-        record = await store.put(
+        await store.put(
             thread_id="t1",
             run_id="r1",
             event_type="tool_end",

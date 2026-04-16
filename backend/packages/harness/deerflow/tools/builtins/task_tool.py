@@ -67,13 +67,8 @@ async def task_tool(
     if config is None:
         available = ", ".join(available_subagent_names)
         return f"Error: Unknown subagent type '{subagent_type}'. Available: {available}"
-    if subagent_type == "bash":
-        try:
-            host_bash_config = resolve_context(runtime).app_config
-        except Exception:
-            host_bash_config = None
-        if not is_host_bash_allowed(host_bash_config):
-            return f"Error: {LOCAL_BASH_SUBAGENT_DISABLED_MESSAGE}"
+    if subagent_type == "bash" and not is_host_bash_allowed(resolve_context(runtime).app_config):
+        return f"Error: {LOCAL_BASH_SUBAGENT_DISABLED_MESSAGE}"
 
     # Build config overrides
     overrides: dict = {}

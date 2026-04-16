@@ -69,6 +69,28 @@ def provisioner_module():
 
 
 @pytest.fixture(autouse=True)
+def _auto_app_config():
+    """Initialize a minimal AppConfig for tests so ``AppConfig.current()`` never tries to auto-load config.yaml.
+
+    Individual tests can still override via ``patch.object(AppConfig, "current", ...)``
+    or by calling ``AppConfig.init()`` with a different config.
+    """
+    try:
+        from deerflow.config.app_config import AppConfig
+        from deerflow.config.sandbox_config import SandboxConfig
+    except ImportError:
+        yield
+        return
+
+    previous_global = AppConfig._global
+    AppConfig._global = AppConfig(sandbox=SandboxConfig(use="test"))
+    try:
+        yield
+    finally:
+        AppConfig._global = previous_global
+
+
+@pytest.fixture(autouse=True)
 def _auto_user_context(request):
     """Inject a default ``test-user-autouse`` into the contextvar.
 

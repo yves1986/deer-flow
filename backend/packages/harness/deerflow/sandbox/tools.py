@@ -987,12 +987,11 @@ def bash_tool(runtime: ToolRuntime[ContextT, ThreadState], description: str, com
     """
     try:
         sandbox = ensure_sandbox_initialized(runtime)
+        app_config = resolve_context(runtime).app_config
+        sandbox_cfg = app_config.sandbox
+        max_chars = sandbox_cfg.bash_output_max_chars if sandbox_cfg else 20000
         if is_local_sandbox(runtime):
-            try:
-                host_bash_config = resolve_context(runtime).app_config
-            except Exception:
-                host_bash_config = None
-            if not is_host_bash_allowed(host_bash_config):
+            if not is_host_bash_allowed(app_config):
                 return f"Error: {LOCAL_HOST_BASH_DISABLED_MESSAGE}"
             ensure_thread_directories_exist(runtime)
             thread_data = get_thread_data(runtime)
@@ -1000,18 +999,8 @@ def bash_tool(runtime: ToolRuntime[ContextT, ThreadState], description: str, com
             command = replace_virtual_paths_in_command(command, thread_data)
             command = _apply_cwd_prefix(command, thread_data)
             output = sandbox.execute_command(command)
-            try:
-                sandbox_cfg = resolve_context(runtime).app_config.sandbox
-                max_chars = sandbox_cfg.bash_output_max_chars if sandbox_cfg else 20000
-            except Exception:
-                max_chars = 20000
             return _truncate_bash_output(mask_local_paths_in_output(output, thread_data), max_chars)
         ensure_thread_directories_exist(runtime)
-        try:
-            sandbox_cfg = resolve_context(runtime).app_config.sandbox
-            max_chars = sandbox_cfg.bash_output_max_chars if sandbox_cfg else 20000
-        except Exception:
-            max_chars = 20000
         return _truncate_bash_output(sandbox.execute_command(command), max_chars)
     except SandboxError as e:
         return f"Error: {e}"
@@ -1047,11 +1036,8 @@ def ls_tool(runtime: ToolRuntime[ContextT, ThreadState], description: str, path:
         if not children:
             return "(empty)"
         output = "\n".join(children)
-        try:
-            sandbox_cfg = resolve_context(runtime).app_config.sandbox
-            max_chars = sandbox_cfg.ls_output_max_chars if sandbox_cfg else 20000
-        except Exception:
-            max_chars = 20000
+        sandbox_cfg = resolve_context(runtime).app_config.sandbox
+        max_chars = sandbox_cfg.ls_output_max_chars if sandbox_cfg else 20000
         return _truncate_ls_output(output, max_chars)
     except SandboxError as e:
         return f"Error: {e}"
@@ -1218,11 +1204,8 @@ def read_file_tool(
             return "(empty)"
         if start_line is not None and end_line is not None:
             content = "\n".join(content.splitlines()[start_line - 1 : end_line])
-        try:
-            sandbox_cfg = resolve_context(runtime).app_config.sandbox
-            max_chars = sandbox_cfg.read_file_output_max_chars if sandbox_cfg else 50000
-        except Exception:
-            max_chars = 50000
+        sandbox_cfg = resolve_context(runtime).app_config.sandbox
+        max_chars = sandbox_cfg.read_file_output_max_chars if sandbox_cfg else 50000
         return _truncate_read_file_output(content, max_chars)
     except SandboxError as e:
         return f"Error: {e}"

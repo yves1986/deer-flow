@@ -8,8 +8,7 @@ from langchain.agents.middleware import AgentMiddleware
 from langgraph.config import get_config
 from langgraph.runtime import Runtime
 
-from deerflow.config.app_config import AppConfig
-from deerflow.config.deer_flow_context import DeerFlowContext, resolve_context
+from deerflow.config.deer_flow_context import DeerFlowContext
 from deerflow.config.title_config import TitleConfig
 from deerflow.models import create_chat_model
 
@@ -46,10 +45,8 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
 
         return ""
 
-    def _should_generate_title(self, state: TitleMiddlewareState, title_config: TitleConfig | None = None) -> bool:
+    def _should_generate_title(self, state: TitleMiddlewareState, title_config: TitleConfig) -> bool:
         """Check if we should generate a title for this thread."""
-        if title_config is None:
-            title_config = AppConfig.current().title
         if not title_config.enabled:
             return False
 
@@ -69,13 +66,11 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
         # Generate title after first complete exchange
         return len(user_messages) == 1 and len(assistant_messages) >= 1
 
-    def _build_title_prompt(self, state: TitleMiddlewareState, title_config: TitleConfig | None = None) -> tuple[str, str]:
+    def _build_title_prompt(self, state: TitleMiddlewareState, title_config: TitleConfig) -> tuple[str, str]:
         """Extract user/assistant messages and build the title prompt.
 
         Returns (prompt_string, user_msg) so callers can use user_msg as fallback.
         """
-        if title_config is None:
-            title_config = AppConfig.current().title
         messages = state.get("messages", [])
 
         user_msg_content = next((m.content for m in messages if m.type == "human"), "")
@@ -91,17 +86,13 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
         )
         return prompt, user_msg
 
-    def _parse_title(self, content: object, title_config: TitleConfig | None = None) -> str:
+    def _parse_title(self, content: object, title_config: TitleConfig) -> str:
         """Normalize model output into a clean title string."""
-        if title_config is None:
-            title_config = AppConfig.current().title
         title_content = self._normalize_content(content)
         title = title_content.strip().strip('"').strip("'")
         return title[: title_config.max_chars] if len(title) > title_config.max_chars else title
 
-    def _fallback_title(self, user_msg: str, title_config: TitleConfig | None = None) -> str:
-        if title_config is None:
-            title_config = AppConfig.current().title
+    def _fallback_title(self, user_msg: str, title_config: TitleConfig) -> str:
         fallback_chars = min(title_config.max_chars, 50)
         if len(user_msg) > fallback_chars:
             return user_msg[:fallback_chars].rstrip() + "..."
@@ -121,20 +112,16 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
         config["tags"] = [*(config.get("tags") or []), "middleware:title"]
         return config
 
-    def _generate_title_result(self, state: TitleMiddlewareState, title_config: TitleConfig | None = None) -> dict | None:
+    def _generate_title_result(self, state: TitleMiddlewareState, title_config: TitleConfig) -> dict | None:
         """Generate a local fallback title without blocking on an LLM call."""
-        if title_config is None:
-            title_config = AppConfig.current().title
         if not self._should_generate_title(state, title_config):
             return None
 
         _, user_msg = self._build_title_prompt(state, title_config)
         return {"title": self._fallback_title(user_msg, title_config)}
 
-    async def _agenerate_title_result(self, state: TitleMiddlewareState, title_config: TitleConfig | None = None) -> dict | None:
+    async def _agenerate_title_result(self, state: TitleMiddlewareState, title_config: TitleConfig) -> dict | None:
         """Generate a title asynchronously and fall back locally on failure."""
-        if title_config is None:
-            title_config = AppConfig.current().title
         if not self._should_generate_title(state, title_config):
             return None
 
@@ -153,21 +140,10 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
             logger.debug("Failed to generate async title; falling back to local title", exc_info=True)
         return {"title": self._fallback_title(user_msg, title_config)}
 
-    def _resolve_title_config(self, runtime: Runtime[DeerFlowContext]) -> TitleConfig | None:
-        """Resolve TitleConfig from the runtime context when possible.
-
-        Returns None on any failure so callers can fall back to
-        ``AppConfig.current()`` without raising.
-        """
-        try:
-            return resolve_context(runtime).app_config.title
-        except Exception:
-            return None
-
     @override
     def after_model(self, state: TitleMiddlewareState, runtime: Runtime[DeerFlowContext]) -> dict | None:
-        return self._generate_title_result(state, self._resolve_title_config(runtime))
+        return self._generate_title_result(state, runtime.context.app_config.title)
 
     @override
     async def aafter_model(self, state: TitleMiddlewareState, runtime: Runtime[DeerFlowContext]) -> dict | None:
-        return await self._agenerate_title_result(state, self._resolve_title_config(runtime))
+        return await self._agenerate_title_result(state, runtime.context.app_config.title)

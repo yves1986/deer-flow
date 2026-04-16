@@ -14,12 +14,28 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI, HTTPException, Request
 
+from deerflow.config.app_config import AppConfig
 from deerflow.runtime import RunContext, RunManager
 
 if TYPE_CHECKING:
     from app.gateway.auth.local_provider import LocalAuthProvider
     from app.gateway.auth.repositories.sqlite import SQLiteUserRepository
     from deerflow.persistence.thread_meta.base import ThreadMetaStore
+
+
+def get_config(request: Request) -> AppConfig:
+    """FastAPI dependency returning the app-scoped ``AppConfig``.
+
+    Prefer this over ``AppConfig.current()`` in new code. Reads from
+    ``request.app.state.config`` which is set at startup (``app.py``
+    lifespan) and swapped on config reload (``routers/mcp.py``,
+    ``routers/skills.py``). Phase 2 of the config refactor migrates all
+    router-level ``AppConfig.current()`` callers to this dependency.
+    """
+    cfg = getattr(request.app.state, "config", None)
+    if cfg is None:
+        raise HTTPException(status_code=503, detail="Configuration not available")
+    return cfg
 
 
 @asynccontextmanager

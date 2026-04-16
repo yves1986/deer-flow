@@ -145,9 +145,14 @@ async def _migrate_orphaned_threads(store, admin_user_id: str) -> int:
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
 
-    # Load config and check necessary environment variables at startup
+    # Load config and check necessary environment variables at startup.
+    # Phase 2: explicit-passing primitive. app.state.config is the single source
+    # of truth for FastAPI request handlers via Depends(get_config). AppConfig.init()
+    # is still invoked for backward compatibility with legacy AppConfig.current()
+    # callers that haven't been migrated yet.
     try:
-        AppConfig.current()
+        app.state.config = AppConfig.from_file()
+        AppConfig.init(app.state.config)
         logger.info("Configuration loaded successfully")
     except Exception as e:
         error_msg = f"Failed to load configuration during gateway startup: {e}"

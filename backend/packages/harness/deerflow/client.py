@@ -143,8 +143,12 @@ class DeerFlowClient:
             middlewares: Optional list of custom middlewares to inject into the agent.
         """
         if config_path is not None:
-            AppConfig.init(AppConfig.from_file(config_path))
+            config = AppConfig.from_file(config_path)
+            AppConfig.init(config)
         self._app_config = AppConfig.current()
+        # Scope this client's config to the current context so it doesn't
+        # leak into unrelated async tasks when multiple clients coexist.
+        self._config_token = AppConfig.set_override(self._app_config)
 
         if agent_name is not None and not AGENT_NAME_PATTERN.match(agent_name):
             raise ValueError(f"Invalid agent name '{agent_name}'. Must match pattern: {AGENT_NAME_PATTERN.pattern}")
@@ -171,6 +175,13 @@ class DeerFlowClient:
         """
         self._agent = None
         self._agent_config_key = None
+
+    def _reload_config(self) -> None:
+        """Reload config from file, update both process-global and context override."""
+        config = AppConfig.from_file()
+        AppConfig.init(config)
+        self._app_config = config
+        self._config_token = AppConfig.set_override(config)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -850,7 +861,7 @@ class DeerFlowClient:
 
         self._agent = None
         self._agent_config_key = None
-        AppConfig.init(AppConfig.from_file())
+        self._reload_config()
         reloaded = AppConfig.current().extensions
         return {"mcp_servers": {name: server.model_dump() for name, server in reloaded.mcp_servers.items()}}
 
@@ -917,7 +928,7 @@ class DeerFlowClient:
 
         self._agent = None
         self._agent_config_key = None
-        AppConfig.init(AppConfig.from_file())
+        self._reload_config()
 
         updated = next((s for s in load_skills(enabled_only=False) if s.name == name), None)
         if updated is None:

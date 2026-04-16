@@ -6,8 +6,14 @@ via Runtime[DeerFlowContext] parameters, through resolve_context().
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from deerflow.config.app_config import AppConfig
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -18,7 +24,7 @@ class DeerFlowContext:
     Mutable runtime state (e.g. sandbox_id) flows through ThreadState, not here.
     """
 
-    app_config: Any  # AppConfig — typed as Any to avoid circular import at module level
+    app_config: AppConfig
     thread_id: str
     agent_name: str | None = None
 
@@ -37,9 +43,12 @@ def resolve_context(runtime: Any) -> DeerFlowContext:
 
     # Try dict context first (legacy path, tests), then configurable
     if isinstance(ctx, dict):
+        thread_id = ctx.get("thread_id", "")
+        if not thread_id:
+            logger.warning("resolve_context: dict context has empty thread_id — may cause incorrect path resolution")
         return DeerFlowContext(
             app_config=AppConfig.current(),
-            thread_id=ctx.get("thread_id", ""),
+            thread_id=thread_id,
             agent_name=ctx.get("agent_name"),
         )
 
@@ -52,8 +61,12 @@ def resolve_context(runtime: Any) -> DeerFlowContext:
         # Outside runnable context (e.g. unit tests)
         cfg = {}
 
+    thread_id = cfg.get("thread_id", "")
+    if not thread_id:
+        logger.warning("resolve_context: falling back to empty thread_id — no DeerFlowContext or configurable found")
+
     return DeerFlowContext(
         app_config=AppConfig.current(),
-        thread_id=cfg.get("thread_id", ""),
+        thread_id=thread_id,
         agent_name=cfg.get("agent_name"),
     )

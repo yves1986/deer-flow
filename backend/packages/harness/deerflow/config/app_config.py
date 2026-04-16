@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from pathlib import Path
 from typing import Any, ClassVar, Self
 
@@ -223,6 +223,10 @@ class AppConfig(BaseModel):
         return next((group for group in self.tool_groups if group.name == name), None)
 
     # -- Lifecycle (process-global + per-context override) --
+    #
+    # _global is a plain class variable. Assignment is atomic under the GIL
+    # (single pointer swap), so no lock is needed for the current read/write
+    # pattern. If this ever changes to read-modify-write, add a threading.Lock.
 
     _global: ClassVar[AppConfig | None] = None
     _override: ClassVar[ContextVar[AppConfig]] = ContextVar("deerflow_app_config_override")
@@ -233,15 +237,28 @@ class AppConfig(BaseModel):
         cls._global = config
 
     @classmethod
-    def set_override(cls, config: AppConfig) -> None:
-        """Set a per-context override (e.g., for a single invocation with custom config)."""
-        cls._override.set(config)
+    def set_override(cls, config: AppConfig) -> Token[AppConfig]:
+        """Set a per-context override. Returns a token for reset_override().
+
+        Use this in DeerFlowClient or test fixtures to scope a config to the
+        current async context without polluting the process-global value.
+        """
+        return cls._override.set(config)
+
+    @classmethod
+    def reset_override(cls, token: Token[AppConfig]) -> None:
+        """Restore the override to its previous value."""
+        cls._override.reset(token)
 
     @classmethod
     def current(cls) -> AppConfig:
         """Get the current AppConfig.
 
         Priority: per-context override > process-global > auto-load from file.
+
+        The auto-load fallback exists for backward compatibility. Prefer calling
+        ``AppConfig.init()`` explicitly at process startup so that config errors
+        surface early rather than at an arbitrary first-use call site.
         """
         try:
             return cls._override.get()
@@ -249,7 +266,10 @@ class AppConfig(BaseModel):
             pass
         if cls._global is not None:
             return cls._global
-        logger.debug("AppConfig not initialized, auto-loading from file")
+        logger.warning(
+            "AppConfig.current() called before init(); auto-loading from file. "
+            "Call AppConfig.init() at process startup to surface config errors early."
+        )
         config = cls.from_file()
         cls._global = config
         return config

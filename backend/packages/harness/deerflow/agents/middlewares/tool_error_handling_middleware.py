@@ -1,8 +1,10 @@
 """Tool error handling middleware and shared runtime middleware builders."""
 
+from __future__ import annotations
+
 import logging
 from collections.abc import Awaitable, Callable
-from typing import override
+from typing import TYPE_CHECKING, override
 
 from langchain.agents import AgentState
 from langchain.agents.middleware import AgentMiddleware
@@ -10,6 +12,9 @@ from langchain_core.messages import ToolMessage
 from langgraph.errors import GraphBubbleUp
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command
+
+if TYPE_CHECKING:
+    from deerflow.config.app_config import AppConfig
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +72,7 @@ class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
 
 def _build_runtime_middlewares(
     *,
+    app_config: "AppConfig | None" = None,
     include_uploads: bool,
     include_dangling_tool_call_patch: bool,
     lazy_init: bool = True,
@@ -75,6 +81,10 @@ def _build_runtime_middlewares(
     from deerflow.agents.middlewares.llm_error_handling_middleware import LLMErrorHandlingMiddleware
     from deerflow.agents.middlewares.thread_data_middleware import ThreadDataMiddleware
     from deerflow.sandbox.middleware import SandboxMiddleware
+    from deerflow.config.app_config import AppConfig
+
+    if app_config is None:
+        app_config = AppConfig.current()
 
     middlewares: list[AgentMiddleware] = [
         ThreadDataMiddleware(lazy_init=lazy_init),
@@ -94,9 +104,7 @@ def _build_runtime_middlewares(
     middlewares.append(LLMErrorHandlingMiddleware())
 
     # Guardrail middleware (if configured)
-    from deerflow.config.app_config import AppConfig
-
-    guardrails_config = AppConfig.current().guardrails
+    guardrails_config = app_config.guardrails
     if guardrails_config.enabled and guardrails_config.provider:
         import inspect
 
@@ -125,9 +133,10 @@ def _build_runtime_middlewares(
     return middlewares
 
 
-def build_lead_runtime_middlewares(*, lazy_init: bool = True) -> list[AgentMiddleware]:
+def build_lead_runtime_middlewares(*, app_config: "AppConfig | None" = None, lazy_init: bool = True) -> list[AgentMiddleware]:
     """Middlewares shared by lead agent runtime before lead-only middlewares."""
     return _build_runtime_middlewares(
+        app_config=app_config,
         include_uploads=True,
         include_dangling_tool_call_patch=True,
         lazy_init=lazy_init,

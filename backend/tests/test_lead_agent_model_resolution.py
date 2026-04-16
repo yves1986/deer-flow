@@ -32,7 +32,7 @@ def _make_model(name: str, *, supports_thinking: bool) -> ModelConfig:
     )
 
 
-def test_resolve_model_name_falls_back_to_default(monkeypatch, caplog):
+def test_resolve_model_name_falls_back_to_default(caplog):
     app_config = _make_app_config(
         [
             _make_model("default-model", supports_thinking=False),
@@ -40,16 +40,14 @@ def test_resolve_model_name_falls_back_to_default(monkeypatch, caplog):
         ]
     )
 
-    monkeypatch.setattr(AppConfig, "current", staticmethod(lambda: app_config))
-
     with caplog.at_level("WARNING"):
-        resolved = lead_agent_module._resolve_model_name("missing-model")
+        resolved = lead_agent_module._resolve_model_name(app_config, "missing-model")
 
     assert resolved == "default-model"
     assert "fallback to default model 'default-model'" in caplog.text
 
 
-def test_resolve_model_name_uses_default_when_none(monkeypatch):
+def test_resolve_model_name_uses_default_when_none():
     app_config = _make_app_config(
         [
             _make_model("default-model", supports_thinking=False),
@@ -57,23 +55,19 @@ def test_resolve_model_name_uses_default_when_none(monkeypatch):
         ]
     )
 
-    monkeypatch.setattr(AppConfig, "current", staticmethod(lambda: app_config))
-
-    resolved = lead_agent_module._resolve_model_name(None)
+    resolved = lead_agent_module._resolve_model_name(app_config, None)
 
     assert resolved == "default-model"
 
 
-def test_resolve_model_name_raises_when_no_models_configured(monkeypatch):
+def test_resolve_model_name_raises_when_no_models_configured():
     app_config = _make_app_config([])
-
-    monkeypatch.setattr(AppConfig, "current", staticmethod(lambda: app_config))
 
     with pytest.raises(
         ValueError,
         match="No chat models are configured",
     ):
-        lead_agent_module._resolve_model_name("missing-model")
+        lead_agent_module._resolve_model_name(app_config, "missing-model")
 
 
 def test_make_lead_agent_disables_thinking_when_model_does_not_support_it(monkeypatch):
@@ -83,7 +77,7 @@ def test_make_lead_agent_disables_thinking_when_model_does_not_support_it(monkey
 
     monkeypatch.setattr(AppConfig, "current", staticmethod(lambda: app_config))
     monkeypatch.setattr(tools_module, "get_available_tools", lambda **kwargs: [])
-    monkeypatch.setattr(lead_agent_module, "_build_middlewares", lambda config, model_name, agent_name=None: [])
+    monkeypatch.setattr(lead_agent_module, "_build_middlewares", lambda app_config, config, model_name, agent_name=None: [])
 
     captured: dict[str, object] = {}
 
@@ -130,10 +124,10 @@ def test_build_middlewares_uses_resolved_model_name_for_vision(monkeypatch):
 
     AppConfig.init(app_config)
     monkeypatch.setattr(AppConfig, "current", staticmethod(lambda: app_config))
-    monkeypatch.setattr(lead_agent_module, "_create_summarization_middleware", lambda: None)
+    monkeypatch.setattr(lead_agent_module, "_create_summarization_middleware", lambda _ac: None)
     monkeypatch.setattr(lead_agent_module, "_create_todo_list_middleware", lambda is_plan_mode: None)
 
-    middlewares = lead_agent_module._build_middlewares({"configurable": {"model_name": "stale-model", "is_plan_mode": False, "subagent_enabled": False}}, model_name="vision-model", custom_middlewares=[MagicMock()])
+    middlewares = lead_agent_module._build_middlewares(app_config, {"configurable": {"model_name": "stale-model", "is_plan_mode": False, "subagent_enabled": False}}, model_name="vision-model", custom_middlewares=[MagicMock()])
 
     assert any(isinstance(m, lead_agent_module.ViewImageMiddleware) for m in middlewares)
     # verify the custom middleware is injected correctly
@@ -161,7 +155,7 @@ def test_create_summarization_middleware_uses_configured_model_alias(monkeypatch
     monkeypatch.setattr(lead_agent_module, "create_chat_model", _fake_create_chat_model)
     monkeypatch.setattr(lead_agent_module, "SummarizationMiddleware", lambda **kwargs: kwargs)
 
-    middleware = lead_agent_module._create_summarization_middleware()
+    middleware = lead_agent_module._create_summarization_middleware(patched)
 
     assert captured["name"] == "model-masswork"
     assert captured["thinking_enabled"] is False
